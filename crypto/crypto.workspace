@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <CodeLite_Workspace Name="crypto" Database="./crypto.tags">
   <Project Name="crypto" Path="crypto.project" Active="Yes"/>
+  <Project Name="cryptoServer" Path="cryptoServer.project" Active="No"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="yes">
       <Project Name="crypto" ConfigName="Debug"/>
+      <Project Name="cryptoServer" ConfigName="Debug"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="Release" Selected="yes">
       <Project Name="crypto" ConfigName="Release"/>
+      <Project Name="cryptoServer" ConfigName="Release"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
 </CodeLite_Workspace>

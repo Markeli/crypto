@@ -3,7 +3,7 @@
 ## any manual changes will be erased      
 ##
 ## Debug
-ProjectName            :=crypto
+ProjectName            :=cryptoServer
 ConfigurationName      :=Debug
 IntermediateDirectory  :=./Debug
 OutDir                 := $(IntermediateDirectory)
@@ -48,7 +48,7 @@ LibPath                := "$(LibraryPathSwitch)."
 ## User defined environment variables
 ##
 CodeLiteDir:=/usr/share/codelite
-Objects=$(IntermediateDirectory)/myfinger$(ObjectSuffix) 
+Objects=$(IntermediateDirectory)/myfingered$(ObjectSuffix) 
 
 ##
 ## Main Build Targets 
@@ -68,13 +68,13 @@ PreBuild:
 ##
 ## Objects
 ##
-$(IntermediateDirectory)/myfinger$(ObjectSuffix): myfinger.c $(IntermediateDirectory)/myfinger$(DependSuffix)
-	$(C_CompilerName) $(SourceSwitch) "/home/markeli/Documents/ITMO/SPL/Labs/Lab5/crypto/crypto/myfinger.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/myfinger$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/myfinger$(DependSuffix): myfinger.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/myfinger$(ObjectSuffix) -MF$(IntermediateDirectory)/myfinger$(DependSuffix) -MM "/home/markeli/Documents/ITMO/SPL/Labs/Lab5/crypto/crypto/myfinger.c"
+$(IntermediateDirectory)/myfingered$(ObjectSuffix): myfingered.c $(IntermediateDirectory)/myfingered$(DependSuffix)
+	$(C_CompilerName) $(SourceSwitch) "/home/markeli/Documents/ITMO/SPL/Labs/Lab5/crypto/crypto/myfingered.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/myfingered$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/myfingered$(DependSuffix): myfingered.c
+	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/myfingered$(ObjectSuffix) -MF$(IntermediateDirectory)/myfingered$(DependSuffix) -MM "/home/markeli/Documents/ITMO/SPL/Labs/Lab5/crypto/crypto/myfingered.c"
 
-$(IntermediateDirectory)/myfinger$(PreprocessSuffix): myfinger.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/myfinger$(PreprocessSuffix) "/home/markeli/Documents/ITMO/SPL/Labs/Lab5/crypto/crypto/myfinger.c"
+$(IntermediateDirectory)/myfingered$(PreprocessSuffix): myfingered.c
+	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/myfingered$(PreprocessSuffix) "/home/markeli/Documents/ITMO/SPL/Labs/Lab5/crypto/crypto/myfingered.c"
 
 
 -include $(IntermediateDirectory)/*$(DependSuffix)
@@ -82,9 +82,9 @@ $(IntermediateDirectory)/myfinger$(PreprocessSuffix): myfinger.c
 ## Clean
 ##
 clean:
-	$(RM) $(IntermediateDirectory)/myfinger$(ObjectSuffix)
-	$(RM) $(IntermediateDirectory)/myfinger$(DependSuffix)
-	$(RM) $(IntermediateDirectory)/myfinger$(PreprocessSuffix)
+	$(RM) $(IntermediateDirectory)/myfingered$(ObjectSuffix)
+	$(RM) $(IntermediateDirectory)/myfingered$(DependSuffix)
+	$(RM) $(IntermediateDirectory)/myfingered$(PreprocessSuffix)
 	$(RM) $(OutputFile)
 
 

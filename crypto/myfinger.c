@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define FINGER_PORT 79
+#define PORT 8457
 #define bzero(ptr, size) memset (ptr, 0, size)
 
 /* Create a TCP connection to host and port.
@@ -17,7 +17,6 @@ int tcpconnect (char *host, int port)
 	struct hostent *h;
 	struct sockaddr_in sa;
 	int s;
-//	Returns a file
 	/* Get the address of the host at which to finger from the
 	* hostname. */
 	h = gethostbyname (host);
@@ -54,49 +53,114 @@ int tcpconnect (char *host, int port)
 	return s;
 }
 
-int
-main (int argc, char **argv)
+/* Read a line of input from a file descriptor and return it. Returns
+* NULL on EOF/error/out of memory. May over-read, so don’t use this
+* if there is useful data after the first line. */
+static char *readline (int s)
+{
+	char *buf = NULL, *nbuf;
+	int buf_pos = 0, buf_len = 0;
+	int i, n;
+	for (;;) 
+	{
+		/* Ensure there is room in the buffer */
+		if (buf_pos == buf_len) 
+		{
+			buf_len = buf_len ? buf_len << 1 : 4;
+			nbuf = realloc (buf, buf_len);
+			if (!nbuf) 
+			{
+				free (buf);
+				return NULL;
+			}
+		buf = nbuf;
+		}
+		/* Read some data into the buffer */
+		n = read (s, buf + buf_pos, buf_len - buf_pos);
+		if (n <= 0) 
+		{
+			if (n < 0)
+				perror ("read");
+			else
+				fprintf (stderr, "read: EOF\n");
+			free (buf);
+			return NULL;
+		}
+		/* Look for the end of a line, and return if we got it. Be
+		* generous in what we consider to be the end of a line. */
+		for (i = buf_pos; i < buf_pos + n; i++)
+			if (buf[i] == '\0' || buf[i] == '\r' || buf[i] == '\n') 
+			{
+				buf[i] = '\0';
+				return buf;
+			}
+		buf_pos += n;
+	}
+}
+
+int main (int argc, char **argv)
 {
 	char *user;
 	char *host;
+	char *message;
 	int s;
 	int nread;
 	char buf[1024];
 	/* Get the name of the host at which to finger from the end of the
 	* command line argument. */
-	if (argc == 2)
+	if (argc == 3)
 	{
-		user = malloc (1 + strlen (argv[1]));
+		user = malloc (strlen (argv[1]));
 		if (!user) 
 		{
 			fprintf (stderr, "out of memory\n");
 			exit (1);
 		}
 		strcpy (user, argv[1]);
-		host = strrchr (user, '@');
+		host = malloc (strlen (argv[2]));
+		if (!host) 
+		{
+			fprintf (stderr, "out of memory\n");
+			exit (1);
+		}
+		strcpy (host, argv[2]);
 	}
 	else
-	user = host = NULL;
+	{
+		user = host = NULL;
+	}
+	printf(user);
+	printf("\n");
+	printf(host);
+	printf("\n");
 	if (!host)
 	{
 		fprintf (stderr, "usage: %s user@host\n", argv[0]);
 		exit (1);
 	}
-	*host++ = '\0';
+	
+	printf("%s\n","Client is connecting");
 	/* Try connecting to the host. */
-	s = tcpconnect (host, FINGER_PORT);
+	s = tcpconnect (host, PORT);
 	if (s < 0)
 	exit (1);
+	printf("%s\n","Client is connected");
 	/* Send the username to finger */
-	if (write (s, user, strlen (user)) < 0 || write (s, "\r\n", 2) < 0) 
+//	message = malloc(strlen("Джигурда cетевой с ментолом\0"));
+//	strcpy(message, "Джигурда cетевой с ментолом\0");
+	printf("%s\n","Sending message...");
+	if (write (s, "Fuck the system\0", 16) < 0) 
 	{
-		perror (host);
+		perror ("Sending error");
 		exit (1);
 	}
+	printf("%s\n","Message is sended. Wait fo answer...");
+	printf("Server says: \n ");
 	/* Now copy the result of the finger command to stdout. */
 	while ((nread = read (s, buf, sizeof (buf))) > 0)
 	write (1, buf, nread);
-	exit (0);
+	//printf("%s\n", readline(s));
+  exit (0);
 }
 
 
