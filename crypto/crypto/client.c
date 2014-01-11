@@ -56,6 +56,7 @@ static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres)
         perror("connect");
         exit(1);
     }
+    printf("Wellcome to room.");
 }
 
 int RunClient()

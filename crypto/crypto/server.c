@@ -104,7 +104,7 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres)
         perror("listen");
         exit(1);
     }
-    printf("\nTCPServer Waiting for client on port %d\n", PORT);
+    printf("\nCryptoServer waiting for client on port %d\n", PORT);
     fflush(stdout);
 }
 
