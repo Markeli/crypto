@@ -1,1 +1,0 @@
-Crypto - chat with encrypting.
