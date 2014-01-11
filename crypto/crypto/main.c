@@ -32,8 +32,8 @@ int main()
                     break;
             }
         }
-        while ((!isProgramRuuning) | (countOfErrors <3));
-        if ((countOfErrors >= 3) & (!isProgramRuuning))
+        while ((!isProgramRuuning) & (countOfErrors <3));
+        if ((countOfErrors >= 3) && (!isProgramRuuning))
         {
             printf("The limits of attempts was exceeded. App is closing...");
         }
