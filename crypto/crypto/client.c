@@ -7,59 +7,16 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <common.h>
+#include <string.h>
 
 #define BUFSIZE 1024
 #define PORT 8547
 
-static void SendRecieve(int i, int socketFD)
-{
-    char sendBuf[BUFSIZE];
-    char recievedBuf[BUFSIZE];
-    int bytesRecieved;
+static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres);
+static void SendRecieve(int i, int socketFD, char userName[USER_NAME_LENGTH]);
 
-    if (i == 0)
-    {
-        fgets(sendBuf, BUFSIZE, stdin);
-        if (strcmp(sendBuf , "quit\n") == 0)
-        {
-            exit(0);
-        }
-        else
-        {
-            send(socketFD, sendBuf, strlen(sendBuf), 0);
-        }
-    }
-    else
-    {
-        bytesRecieved = recv(socketFD, recievedBuf, BUFSIZE, 0);
-        recievedBuf[bytesRecieved] = '\0';
-        printf("%s\n" , recievedBuf);
-        fflush(stdout);
-    }
-}
-
-
-static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres)
-{
-    if ((*sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-    {
-        perror("Socket");
-        exit(1);
-    }
-    serverAddres->sin_family = AF_INET;
-    serverAddres->sin_port = htons(PORT);
-    serverAddres->sin_addr.s_addr = inet_addr("127.0.0.1");
-    memset(serverAddres->sin_zero, '\0', sizeof serverAddres->sin_zero);
-
-    if(connect(*sockfd, (struct sockaddr *)serverAddres, sizeof(struct sockaddr)) == -1)
-    {
-        perror("connect");
-        exit(1);
-    }
-    printf("Wellcome to room.");
-}
-
-int RunClient()
+int RunClient(char userName[USER_NAME_LENGTH])
 {
     int socketFD, fdMax, i;
     struct sockaddr_in serverAddres;
@@ -86,11 +43,61 @@ int RunClient()
         {
             if(FD_ISSET(i, &readFDS))
             {
-                SendRecieve(i, socketFD);
+                SendRecieve(i, socketFD, userName);
             }
         }
     }
     printf("client-quited\n");
     close(socketFD);
     return 0;
+}
+
+static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres)
+{
+    if ((*sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        perror("Socket");
+        exit(1);
+    }
+    serverAddres->sin_family = AF_INET;
+    serverAddres->sin_port = htons(PORT);
+    serverAddres->sin_addr.s_addr = inet_addr("127.0.0.1");
+    memset(serverAddres->sin_zero, '\0', sizeof serverAddres->sin_zero);
+
+    if(connect(*sockfd, (struct sockaddr *)serverAddres, sizeof(struct sockaddr)) == -1)
+    {
+        perror("connect");
+        exit(1);
+    }
+    printf("Wellcome to room.");
+}
+
+static void SendRecieve(int i, int socketFD, char userName[USER_NAME_LENGTH])
+{
+    char tempBuf[BUFSIZE];
+    char ioBuf[BUFSIZE];
+    int bytesRecieved;
+
+    if (i == 0)
+    {
+        fgets(tempBuf, BUFSIZE, stdin);
+        if (strcmp(tempBuf , "quit\n") == 0)
+        {
+            exit(0);
+        }
+        else
+        {
+            strcat(ioBuf, userName);
+            strcat(ioBuf, ": ");
+            strcat(ioBuf, tempBuf);
+            send(socketFD, ioBuf, strlen(ioBuf), 0);
+        }
+    }
+    else
+    {
+        bytesRecieved = recv(socketFD, ioBuf, BUFSIZE, 0);
+        ioBuf[bytesRecieved] = '\0';
+        printf("%s\n" , ioBuf);
+        fflush(stdout);
+    }
 }

@@ -25,7 +25,7 @@ int main()
             switch (input)
             {
                 case 1:
-                    RunClient();
+                    RunClient(userName);
                     isProgramRuuning = TRUE;
                     break;
                 case 2:
