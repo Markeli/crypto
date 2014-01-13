@@ -3,10 +3,7 @@
 #include <client.h>
 #include <server.h>
 #include <string.h>
-
-#define TRUE 1
-#define FALSE 0
-#define USER_NAME_LENGTH 16
+#include <common.h>
 
 void GetUserName(char[USER_NAME_LENGTH]);
 
@@ -68,6 +65,5 @@ void GetUserName(char userName[USER_NAME_LENGTH])
         }
     }
     while (!isReadingSuccesfull);
-    return userName;
 }
 

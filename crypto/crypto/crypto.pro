@@ -9,5 +9,6 @@ SOURCES += \
 
 HEADERS += \
     client.h \
-    server.h
+    server.h \
+    common.h
 
