@@ -7,71 +7,53 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <common.h>
 
 #define PORT 8547
 #define BUFSIZE 1024
 
-static void SendToAll(int j, int i, int socketFD, int recievedBytesCount, char *recievedBuf, fd_set *master)
+char adminUserName[USER_NAME_LENGTH];
+
+static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres);
+static void ConnectionAccept(fd_set *master, int *fdMax, int socketFD, struct sockaddr_in *clientAddres);
+static void ReSend(int i, fd_set *master, int socketFD, int fdMax);
+static int SearchControlMessage(char recievedBuf[BUFSIZE]);
+static void SendToAll(int j, int i, int socketFD, int recievedBytesCount, char *recievedBuf, fd_set *master);
+
+int RunServer(char userName[USER_NAME_LENGTH])
 {
-    if (FD_ISSET(j, master))
+    strcpy(adminUserName,userName);
+    fd_set master;
+    fd_set readFDS;
+    int fdMax, i;
+    int socketFD= 0;
+    struct sockaddr_in myAddres, clientAddres;
+    FD_ZERO(&master);
+    FD_ZERO(&readFDS);
+    ConnectRequest(&socketFD, &myAddres);
+    FD_SET(socketFD, &master);
+    fdMax = socketFD;
+    while(1)
     {
-        if (j != socketFD && j != i)
+        readFDS = master;
+        if(select(fdMax+1, &readFDS, NULL, NULL, NULL) == -1)
         {
-            if (send(j, recievedBuf, recievedBytesCount, 0) == -1)
+            perror("select");
+            exit(4);
+        }
+
+        for (i = 0; i <= fdMax; i++)
+        {
+            if (FD_ISSET(i, &readFDS))
             {
-                perror("send");
+                if (i == socketFD)
+                    ConnectionAccept(&master, &fdMax, socketFD, &clientAddres);
+                else
+                    ReSend(i, &master, socketFD, fdMax);
             }
         }
     }
-}
-
-static void SendRecieve(int i, fd_set *master, int socketFD, int fdMax)
-{
-    int recievedBytesCount, j;
-    char recievedBuf[BUFSIZE];
-
-    if ((recievedBytesCount = recv(i, recievedBuf, BUFSIZE, 0)) <= 0)
-    {
-        if (recievedBytesCount == 0)
-        {
-            printf("socket %d hung up\n", i);
-        }
-        else
-        {
-            perror("recv");
-        }
-        close(i);
-        FD_CLR(i, master);
-    }
-    else
-    {
-    //	printf("%s\n", recv_buf);
-        for(j = 0; j <= fdMax; j++)
-        {
-            SendToAll(j, i, socketFD, recievedBytesCount, recievedBuf, master );
-        }
-    }
-}
-
-static void ConnectionAccept(fd_set *master, int *fdMax, int socketFD, struct sockaddr_in *clientAddres)
-{
-    socklen_t addresLength;
-    int newSocketFD;
-
-    addresLength = sizeof(struct sockaddr_in);
-    if((newSocketFD = accept(socketFD, (struct sockaddr *)clientAddres, &addresLength)) == -1)
-    {
-        perror("accept");
-        exit(1);
-    }
-    else
-    {
-        FD_SET(newSocketFD, master);
-        if(newSocketFD > *fdMax){
-            *fdMax = newSocketFD;
-        }
-        printf("new connection from %s on port %d \n",inet_ntoa(clientAddres->sin_addr), ntohs(clientAddres->sin_port));
-    }
+    return 0;
 }
 
 static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres)
@@ -108,37 +90,78 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres)
     fflush(stdout);
 }
 
-int RunServer()
+static void ConnectionAccept(fd_set *master, int *fdMax, int socketFD, struct sockaddr_in *clientAddres)
 {
-    fd_set master;
-    fd_set readFDS;
-    int fdMax, i;
-    int socketFD= 0;
-    struct sockaddr_in myAddres, clientAddres;
-    FD_ZERO(&master);
-    FD_ZERO(&readFDS);
-    ConnectRequest(&socketFD, &myAddres);
-    FD_SET(socketFD, &master);
-    fdMax = socketFD;
-    while(1)
-    {
-        readFDS = master;
-        if(select(fdMax+1, &readFDS, NULL, NULL, NULL) == -1)
-        {
-            perror("select");
-            exit(4);
-        }
+    socklen_t addresLength;
+    int newSocketFD;
 
-        for (i = 0; i <= fdMax; i++)
+    addresLength = sizeof(struct sockaddr_in);
+    if((newSocketFD = accept(socketFD, (struct sockaddr *)clientAddres, &addresLength)) == -1)
+    {
+        perror("accept");
+        exit(1);
+    }
+    else
+    {
+        FD_SET(newSocketFD, master);
+        if(newSocketFD > *fdMax){
+            *fdMax = newSocketFD;
+        }
+        printf("New connection from %s on port %d \n",inet_ntoa(clientAddres->sin_addr), ntohs(clientAddres->sin_port));
+    }
+}
+
+static void ReSend(int i, fd_set *master, int socketFD, int fdMax)
+{
+    int recievedBytesCount, j;
+    char recievedBuf[BUFSIZE];
+
+    if ((recievedBytesCount = recv(i, recievedBuf, BUFSIZE, 0)) <= 0)
+    {
+        if (recievedBytesCount == 0)
         {
-            if (FD_ISSET(i, &readFDS))
+            printf("socket %d hung up\n", i);
+        }
+        else
+        {
+            perror("recv");
+        }
+        close(i);
+        FD_CLR(i, master);
+    }
+    else
+    {
+        SearchControlMessage(recievedBuf);
+        for(j = 0; j <= fdMax; j++)
+        {
+            SendToAll(j, i, socketFD, recievedBytesCount, recievedBuf, master );
+        }
+    }
+}
+
+static int SearchControlMessage(char recievedBuf[BUFSIZE])
+{
+    char tempBuf[BUFSIZE];
+    strcpy(tempBuf, adminUserName);
+    strcat(tempBuf, ":\nserver close\n");
+    printf("rec\n%s\ntemp\n%s\n", recievedBuf, tempBuf);
+
+    if (!strstr(recievedBuf , tempBuf))
+    {
+        exit(0);
+    }
+}
+
+static void SendToAll(int j, int i, int socketFD, int recievedBytesCount, char *recievedBuf, fd_set *master)
+{
+    if (FD_ISSET(j, master))
+    {
+        if (j != socketFD && j != i)
+        {
+            if (send(j, recievedBuf, recievedBytesCount, 0) == -1)
             {
-                if (i == socketFD)
-                    ConnectionAccept(&master, &fdMax, socketFD, &clientAddres);
-                else
-                    SendRecieve(i, &master, socketFD, fdMax);
+                perror("send");
             }
         }
     }
-    return 0;
 }

@@ -80,6 +80,5 @@ void GetUserName(char userName[USER_NAME_LENGTH])
         printf("The limits of attempts was exceeded. App is closing...\n");
         exit(0);
     }
-    printf(userName);
 }
 

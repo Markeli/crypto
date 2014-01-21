@@ -10,6 +10,7 @@
 #include <common.h>
 #include <string.h>
 
+
 #define BUFSIZE 1024
 #define PORT 8547
 
@@ -69,7 +70,6 @@ static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres)
         perror("connect");
         exit(1);
     }
-    printf("Wellcome to room.");
 }
 
 static void SendRecieve(int i, int socketFD, char userName[USER_NAME_LENGTH])
@@ -87,8 +87,8 @@ static void SendRecieve(int i, int socketFD, char userName[USER_NAME_LENGTH])
         }
         else
         {
-            strcat(ioBuf, userName);
-            strcat(ioBuf, ": ");
+            strcpy(ioBuf, userName);
+            strcat(ioBuf, ":\n");
             strcat(ioBuf, tempBuf);
             send(socketFD, ioBuf, strlen(ioBuf), 0);
         }
