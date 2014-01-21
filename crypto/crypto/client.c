@@ -7,17 +7,18 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
-#include <common.h>
 #include <string.h>
+
+#include <common.h>
 
 
 #define BUFSIZE 1024
 #define PORT 8547
 
 static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres);
-static void SendRecieve(int i, int socketFD, char userName[USER_NAME_LENGTH]);
+static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH]);
 
-int RunClient(char userName[USER_NAME_LENGTH])
+int RunClient(char userName[PARAMETRS_LENGTH])
 {
     int socketFD, fdMax, i;
     struct sockaddr_in serverAddres;
@@ -72,7 +73,7 @@ static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres)
     }
 }
 
-static void SendRecieve(int i, int socketFD, char userName[USER_NAME_LENGTH])
+static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
 {
     char tempBuf[BUFSIZE];
     char ioBuf[BUFSIZE];

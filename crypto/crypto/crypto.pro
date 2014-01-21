@@ -5,7 +5,8 @@ CONFIG -= qt
 SOURCES += \
     client.c \
     main.c \
-    server.c
+    server.c \
+    common.c
 
 HEADERS += \
     client.h \

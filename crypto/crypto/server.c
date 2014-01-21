@@ -7,12 +7,14 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+
 #include <common.h>
 
 #define PORT 8547
 #define BUFSIZE 1024
 
-char adminUserName[USER_NAME_LENGTH];
+char adminsName[PARAMETRS_LENGTH];
+char adminsPass[PARAMETRS_LENGTH];
 
 static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres);
 static void ConnectionAccept(fd_set *master, int *fdMax, int socketFD, struct sockaddr_in *clientAddres);
@@ -20,19 +22,23 @@ static void ReSend(int i, fd_set *master, int socketFD, int fdMax);
 static int SearchControlMessage(char recievedBuf[BUFSIZE]);
 static void SendToAll(int j, int i, int socketFD, int recievedBytesCount, char *recievedBuf, fd_set *master);
 
-int RunServer(char userName[USER_NAME_LENGTH])
+
+int RunServer(char userName[PARAMETRS_LENGTH])
 {
-    strcpy(adminUserName,userName);
     fd_set master;
     fd_set readFDS;
     int fdMax, i;
     int socketFD= 0;
     struct sockaddr_in myAddres, clientAddres;
+
+    GetParametr(adminsPass, "admins password\0");
+    printf("Password have been saved.\n");
     FD_ZERO(&master);
     FD_ZERO(&readFDS);
     ConnectRequest(&socketFD, &myAddres);
     FD_SET(socketFD, &master);
     fdMax = socketFD;
+    strcpy(adminsName,userName);
     while(1)
     {
         readFDS = master;
@@ -142,7 +148,7 @@ static void ReSend(int i, fd_set *master, int socketFD, int fdMax)
 static int SearchControlMessage(char recievedBuf[BUFSIZE])
 {
     char tempBuf[BUFSIZE];
-    strcpy(tempBuf, adminUserName);
+    strcpy(tempBuf, adminsName);
     strcat(tempBuf, ":\nserver close\n");
     printf("rec\n%s\ntemp\n%s\n", recievedBuf, tempBuf);
 

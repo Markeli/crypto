@@ -2,6 +2,6 @@
 #define SERVER_H
 #include <common.h>
 
-int RunServer(char userName[USER_NAME_LENGTH]);
+int RunServer(char userName[PARAMETRS_LENGTH]);
 
 #endif // SERVER_H
