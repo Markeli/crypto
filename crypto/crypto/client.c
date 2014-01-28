@@ -162,7 +162,7 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
         bytesRecieved = recv(socketFD, ioBuf, BUFSIZE, 0);
         if (bytesRecieved <=0)
         {
-            FixRecievingError(bytesRecieved, &socketFD, "Recieving error.\n");
+            FixRecievingError(bytesRecieved, &socketFD, "Recieving error. Maybe server closed. App is closing...\n");
             exit(1);
         }
         else

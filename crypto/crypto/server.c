@@ -33,12 +33,12 @@ int RunServer(char userName[PARAMETRS_LENGTH])
 {
     fd_set master;
     fd_set readFDS;
-    int fdMax, i;
+    int fdMax, activeSocket;
     int serverSocketFD= 0;
     struct sockaddr_in myAddres, clientAddres;
 
     clientList = CreateList();
-    adminsSocketFD = -1;
+    adminsSocketFD;
     GetPassword(adminsPass);
     printf("Password have been saved.\n");
     FD_ZERO(&master);
@@ -56,17 +56,17 @@ int RunServer(char userName[PARAMETRS_LENGTH])
             exit(4);
         }
 
-        for (i = 0; i <= fdMax; i++)
+        for (activeSocket = 0; activeSocket <= fdMax; activeSocket++)
         {
-            if (FD_ISSET(i, &readFDS))
+            if (FD_ISSET(activeSocket, &readFDS))
             {
-                if (i == serverSocketFD)
+                if (activeSocket == serverSocketFD)
                 {
                     ConnectionAccept(&master, &fdMax, serverSocketFD, &clientAddres);
                 }
                 else
                 {
-                    ReSend(i, &master, serverSocketFD, fdMax);
+                    ReSend(activeSocket, &master, serverSocketFD, fdMax);
                 }
             }
         }
@@ -204,35 +204,41 @@ static void DenialOfAccepting(int *newSocketFD)
     close(*newSocketFD);
 }
 
-static void ReSend(int i, fd_set *master, int socketFD, int fdMax)
+static void ReSend(int activeSocket, fd_set *master, int serverSocketFD, int fdMax)
 {
     int recievedBytesCount, j;
     char recievedBuf[BUFSIZE];
 
-    if ((recievedBytesCount = recv(i, recievedBuf, BUFSIZE, 0)) <= 0)
+    if ((recievedBytesCount = recv(activeSocket, recievedBuf, BUFSIZE, 0)) <= 0)
     {
         if (recievedBytesCount == 0)
         {
-            printf("socket %d hung up\n", i);
+            printf("socket %d hung up\n", activeSocket);
         }
         else
         {
             perror("recv");
         }
-        DeleteItem(clientList, i);
-        if (i == adminsSocketFD)
+        DeleteItem(clientList, activeSocket);
+        if (activeSocket == adminsSocketFD)
         {
             adminsSocketFD = -1;
         }
-        close(i);
-        FD_CLR(i, master);
+        close(activeSocket);
+        FD_CLR(activeSocket, master);
     }
     else
     {
-        //SearchControlMessage(recievedBuf);
-        for(j = 0; j <= fdMax; j++)
+        if (activeSocket == adminsSocketFD)
         {
-            SendToAll(j, i, socketFD, recievedBytesCount, recievedBuf, master );
+            SearchControlMessage(recievedBuf);
+        }
+        else
+        {
+            for(j = 0; j <= fdMax; j++)
+            {
+                SendToAll(j, activeSocket, serverSocketFD, recievedBytesCount, recievedBuf, master );
+            }
         }
     }
 }
@@ -240,11 +246,9 @@ static void ReSend(int i, fd_set *master, int socketFD, int fdMax)
 static int SearchControlMessage(char recievedBuf[BUFSIZE])
 {
     char tempBuf[BUFSIZE];
-    strcpy(tempBuf, adminsName);
-    strcat(tempBuf, ":\nserver close\n");
     printf("rec\n%s\ntemp\n%s\n", recievedBuf, tempBuf);
 
-    if (!strstr(recievedBuf , tempBuf))
+    if (!strstr(recievedBuf , "server -close"))
     {
         exit(0);
     }
