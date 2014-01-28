@@ -33,7 +33,7 @@ int RunServer(char userName[PARAMETRS_LENGTH])
     fd_set master;
     fd_set readFDS;
     int fdMax, i;
-    int socketFD= 0;
+    int serverSocketFD= 0;
     struct sockaddr_in myAddres, clientAddres;
     clientList = CreateList();
 
@@ -41,9 +41,9 @@ int RunServer(char userName[PARAMETRS_LENGTH])
     printf("Password have been saved.\n");
     FD_ZERO(&master);
     FD_ZERO(&readFDS);
-    ConnectRequest(&socketFD, &myAddres);
-    FD_SET(socketFD, &master);
-    fdMax = socketFD;
+    ConnectRequest(&serverSocketFD, &myAddres);
+    FD_SET(serverSocketFD, &master);
+    fdMax = serverSocketFD;
     strcpy(adminsName,userName);
     while(1)
     {
@@ -58,13 +58,13 @@ int RunServer(char userName[PARAMETRS_LENGTH])
         {
             if (FD_ISSET(i, &readFDS))
             {
-                if (i == socketFD)
+                if (i == serverSocketFD)
                 {
-                    ConnectionAccept(&master, &fdMax, socketFD, &clientAddres);
+                    ConnectionAccept(&master, &fdMax, serverSocketFD, &clientAddres);
                 }
                 else
                 {
-                    ReSend(i, &master, socketFD, fdMax);
+                    ReSend(i, &master, serverSocketFD, fdMax);
                 }
             }
         }
@@ -72,32 +72,31 @@ int RunServer(char userName[PARAMETRS_LENGTH])
     return 0;
 }
 
-static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres)
+static void ConnectRequest(int *serverSocketFD, struct sockaddr_in *myAddres)
 {
     int yes = 1;
-    if ((*socketFD = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    if ((*serverSocketFD = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         perror("Socket");
         exit(1);
     }
-
     myAddres->sin_family = AF_INET;
     myAddres->sin_port = htons(PORT);
     myAddres->sin_addr.s_addr = INADDR_ANY;
     memset(myAddres->sin_zero, '\0', sizeof myAddres->sin_zero);
 
-    if (setsockopt(*socketFD, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+    if (setsockopt(*serverSocketFD, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
     {
         perror("setsockopt");
         exit(1);
     }
 
-    if (bind(*socketFD, (struct sockaddr *)myAddres, sizeof(struct sockaddr)) == -1)
+    if (bind(*serverSocketFD, (struct sockaddr *)myAddres, sizeof(struct sockaddr)) == -1)
     {
         perror("Unable to bind");
         exit(1);
     }
-    if (listen(*socketFD, 10) == -1)
+    if (listen(*serverSocketFD, 10) == -1)
     {
         perror("listen");
         exit(1);
@@ -107,15 +106,15 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres)
 }
 
 /*Accepting new client*/
-static void ConnectionAccept(fd_set *master, int *fdMax, int socketFD, struct sockaddr_in *clientAddres)
+static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, struct sockaddr_in *clientAddres)
 {
     int recievedBytesCount;
     socklen_t addresLength;
-    int newSocketFD;
+    int clientSocketFD;
     char recievedBuffer[BUFSIZE], sendBuffer[BUFSIZE];
 
     addresLength = sizeof(struct sockaddr_in);
-    if((newSocketFD = accept(socketFD, (struct sockaddr *)clientAddres, &addresLength)) == -1)
+    if((clientSocketFD = accept(serverSocketFD, (struct sockaddr *)clientAddres, &addresLength)) == -1)
     {
         perror("accept");
         exit(1);
@@ -123,50 +122,50 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int socketFD, struct so
     else
     {
         /*Getting clients username*/
-        if ((recievedBytesCount = recv(newSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
+        if ((recievedBytesCount = recv(clientSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
         {
-            FixRecievingError(recievedBytesCount, &newSocketFD,"Connetion error occured.\n");
+            FixRecievingError(recievedBytesCount, &clientSocketFD,"Connetion error occured.\n");
         }
         else
         {
             /*Check uniq username in clientList*/
-            if (InsertItemUniq(clientList, 0, recievedBuffer) == TRUE)
+            if (InsertItemUniq(clientList, clientSocketFD, recievedBuffer) == TRUE)
             {
                 /*Check if username belongs to admin*/
                 if (strcmp(recievedBuffer, adminsName) == 0)
                 {
                     strcpy(sendBuffer, "admin");
                     /*Requesting for getting admins password*/
-                    if (send(newSocketFD, sendBuffer, BUFSIZE, 0) == -1)
+                    if (send(clientSocketFD, sendBuffer, BUFSIZE, 0) == -1)
                     {
                         perror("send");
                     }
                     /*Getting admins password from client*/
-                    if ((recievedBytesCount = recv(newSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
+                    if ((recievedBytesCount = recv(clientSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
                     {
-                        FixRecievingError(recievedBytesCount, &newSocketFD,"Connetion error occured.\n");
+                        FixRecievingError(recievedBytesCount, &clientSocketFD,"Connetion error occured.\n");
                     }
                     else
                     {
                         if (strcmp(recievedBuffer, adminsPass) == 0)
                         {
-                            AcceptClient(&newSocketFD, master, fdMax, clientAddres);
+                            AcceptClient(&clientSocketFD, master, fdMax, clientAddres);
                         }
                         else
                         {
-                            DenialOfAccepting(&newSocketFD);
+                            DenialOfAccepting(&clientSocketFD);
                         }
                     }
 
                 }
                 else
                 {
-                    AcceptClient(&newSocketFD, master, fdMax, clientAddres);
+                    AcceptClient(&clientSocketFD, master, fdMax, clientAddres);
                 }
             }
             else
             {
-                DenialOfAccepting(&newSocketFD);
+                DenialOfAccepting(&clientSocketFD);
             }
         }
     }
@@ -186,6 +185,7 @@ static void AcceptClient(int *newSocketFD, fd_set *master, int *fdMax, struct so
         *fdMax = *newSocketFD;
     }
     printf("New connection from %s on port %d \n",inet_ntoa(clientAddres->sin_addr), ntohs(clientAddres->sin_port));
+    PrintList(clientList);
     //strcpy(sendBuffer, recievedBuffer);
     //strcpy(sendBuffer, " joined to the chat!\n");
     //SendToAll(socketFD, socketFD, socketFD, sendBuffer, BUFSIZE, master );
@@ -217,6 +217,7 @@ static void ReSend(int i, fd_set *master, int socketFD, int fdMax)
         {
             perror("recv");
         }
+        DeleteItem(clientList, i);
         close(i);
         FD_CLR(i, master);
     }

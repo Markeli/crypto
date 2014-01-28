@@ -39,11 +39,11 @@ void DeleteList(struct List *list)
     }
 }
 
-int InsertItem(List *list, mkey_t key, char userName[PARAMETRS_LENGTH])
+int InsertItem(List *list, int socketFD, char userName[PARAMETRS_LENGTH])
 {
    Node *item = NewListItem();
    if ( item == NULL ) return 0;
-   item->key = key;
+   item->socketFD = socketFD;
    strcpy( item->userName, userName);
    item->next = list->head;
    list->head = item;
@@ -51,7 +51,7 @@ int InsertItem(List *list, mkey_t key, char userName[PARAMETRS_LENGTH])
    return 1;
 }
 
-int InsertItemUniq(List *list, mkey_t key, char userName[PARAMETRS_LENGTH])
+int InsertItemUniq(List *list, int socketFD, char userName[PARAMETRS_LENGTH])
 {
    if ( list )
    {
@@ -63,8 +63,7 @@ int InsertItemUniq(List *list, mkey_t key, char userName[PARAMETRS_LENGTH])
             return 0;
          }
       }
-      return InsertItem(list, key, userName);
-
+      return InsertItem(list, socketFD, userName);
    }
    else
    {
@@ -72,12 +71,12 @@ int InsertItemUniq(List *list, mkey_t key, char userName[PARAMETRS_LENGTH])
    }
 }
 
-int DeleteItem( List *list, mkey_t key )
+int DeleteItem( List *list, int socketFD )
 {
    Node *item, *previousItem = 0;
    for (  item = list->head; item != NULL; previousItem = item, item = item->next )
    {
-      if ( item->key == key )
+      if ( item->socketFD == socketFD )
       {
          if ( previousItem != 0 )
          {
@@ -104,17 +103,17 @@ void PrintList (  List *list )
    printf( "Size=%d\n", list->elemsCount );
    for ( item = list->head; item != NULL; item = item->next )
    {
-      printf("(%d,%s) -> ", item->key, item->userName);
+      printf("(%d,%s) -> ", item->socketFD, item->userName);
    }
    printf( "NULL\n" );
 }
 
-int FindItem( List *list, mkey_t key)
+int FindItem( List *list, int socketFD)
 {
    Node *item;
    for ( item = list->head; item != NULL; item = item->next )
    {
-      if ( item->key == key )
+      if ( item->socketFD == socketFD )
       {
          return 1;
       }
