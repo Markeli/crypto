@@ -16,7 +16,7 @@ int main()
         int countOfErrors = 0;
         int isProgramRuuning = FALSE;
         printf("Wellcome to crypto - chat with encrypting!\n\v");
-        GetParametr(userName, "username\0");
+        GetUserName(userName);
         do
         {
             printf("Enter 1 to run client or 2 to run server:\n");

@@ -15,16 +15,18 @@
 #define BUFSIZE 1024
 #define PORT 8547
 
+char userName[PARAMETRS_LENGTH];
+
 static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres);
 static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH]);
 
-int RunClient(char userName[PARAMETRS_LENGTH])
+int RunClient(char _userName[PARAMETRS_LENGTH])
 {
     int socketFD, fdMax, i;
     struct sockaddr_in serverAddres;
     fd_set master;
     fd_set readFDS;
-
+    strcpy(userName, _userName);
     ConnectRequest(&socketFD, &serverAddres);
     FD_ZERO(&master);
     FD_ZERO(&readFDS);
@@ -49,14 +51,16 @@ int RunClient(char userName[PARAMETRS_LENGTH])
             }
         }
     }
-    printf("client-quited\n");
+    printf("Client quited\n");
     close(socketFD);
     return 0;
 }
 
-static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres)
+static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
 {
-    if ((*sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    char buffer[BUFSIZE];
+    int recievedBytesCount;
+    if ((*socketFD = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         perror("Socket");
         exit(1);
@@ -66,10 +70,69 @@ static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres)
     serverAddres->sin_addr.s_addr = inet_addr("127.0.0.1");
     memset(serverAddres->sin_zero, '\0', sizeof serverAddres->sin_zero);
 
-    if(connect(*sockfd, (struct sockaddr *)serverAddres, sizeof(struct sockaddr)) == -1)
+    if(connect(*socketFD, (struct sockaddr *)serverAddres, sizeof(struct sockaddr)) == -1)
     {
         perror("connect");
         exit(1);
+    }
+    strcpy(buffer, userName);
+
+    if (send(*socketFD, buffer, BUFSIZE, 0) <= 0)
+    {
+        perror("connect");
+        exit(1);
+    }
+    if ((recievedBytesCount = recv(*socketFD, buffer, BUFSIZE, 0)) <= 0)
+    {
+        FixRecievingError(recievedBytesCount, *socketFD, "Connetion error occured.\n");
+        exit(1);
+    }
+    else
+    {
+        if (strcmp(buffer, "wellcome") == 0)
+        {
+            printf("Connetion is succesfull.\n");
+        }
+        else
+        {
+            if (strcmp(buffer, "sorry") == 0)
+            {
+                printf("This username is already taken. Choose antoher and try again.\n");
+                close(*socketFD);
+                exit(1);
+            }
+            else
+            {
+                if (strcmp(buffer, "admin") == 0)
+                {
+                    printf("This username belongs to admin. If you are admin, enter password:.\n");
+                    GetPassword(buffer);
+                    if (send(*socketFD, buffer, BUFSIZE, 0) <= 0)
+                    {
+                        perror("connect");
+                        exit(1);
+                    }
+                    if ((recievedBytesCount = recv(*socketFD, buffer, BUFSIZE, 0)) <= 0)
+                    {
+                        FixRecievingError(recievedBytesCount, *socketFD, "Connetion error occured.\n");
+                        exit(1);
+                    }
+                    else
+                    {
+                        if (strcmp(buffer, "wellcome") == 0)
+                        {
+                            printf("Connetion is succesfull.\n");
+                        }
+                        else
+                        {
+                            printf("Incorrect password. You are not an admin. App is closing...\n");
+                            close(*socketFD);
+                            exit(1);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

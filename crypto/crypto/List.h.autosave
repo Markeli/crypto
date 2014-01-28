@@ -1,0 +1,16 @@
+#ifndef LIST_H
+#define LIST_H
+#include <common.h>
+
+typedef struct Node *link;
+
+typedef struct Node
+{
+    link next;
+    char userName[PARAMETRS_LENGTH];
+    int socketId;
+}node;
+
+typedef link list;
+
+#endif // LIST_H

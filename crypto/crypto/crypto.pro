@@ -6,10 +6,12 @@ SOURCES += \
     client.c \
     main.c \
     server.c \
-    common.c
+    common.c \
+    list.c
 
 HEADERS += \
     client.h \
     common.h \
-    server.h
+    server.h \
+    list.h
 
