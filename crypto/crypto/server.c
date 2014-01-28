@@ -16,6 +16,7 @@
 
 char adminsName[PARAMETRS_LENGTH];
 char adminsPass[PARAMETRS_LENGTH];
+int adminsSocketFD;
 List *clientList;
 
 static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres);
@@ -35,8 +36,9 @@ int RunServer(char userName[PARAMETRS_LENGTH])
     int fdMax, i;
     int serverSocketFD= 0;
     struct sockaddr_in myAddres, clientAddres;
-    clientList = CreateList();
 
+    clientList = CreateList();
+    adminsSocketFD = -1;
     GetPassword(adminsPass);
     printf("Password have been saved.\n");
     FD_ZERO(&master);
@@ -150,6 +152,7 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
                         if (strcmp(recievedBuffer, adminsPass) == 0)
                         {
                             AcceptClient(&clientSocketFD, master, fdMax, clientAddres);
+                            adminsSocketFD = clientSocketFD;
                         }
                         else
                         {
@@ -185,7 +188,6 @@ static void AcceptClient(int *newSocketFD, fd_set *master, int *fdMax, struct so
         *fdMax = *newSocketFD;
     }
     printf("New connection from %s on port %d \n",inet_ntoa(clientAddres->sin_addr), ntohs(clientAddres->sin_port));
-    PrintList(clientList);
     //strcpy(sendBuffer, recievedBuffer);
     //strcpy(sendBuffer, " joined to the chat!\n");
     //SendToAll(socketFD, socketFD, socketFD, sendBuffer, BUFSIZE, master );
@@ -218,6 +220,10 @@ static void ReSend(int i, fd_set *master, int socketFD, int fdMax)
             perror("recv");
         }
         DeleteItem(clientList, i);
+        if (i == adminsSocketFD)
+        {
+            adminsSocketFD = -1;
+        }
         close(i);
         FD_CLR(i, master);
     }

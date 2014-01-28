@@ -160,8 +160,16 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
     else
     {
         bytesRecieved = recv(socketFD, ioBuf, BUFSIZE, 0);
-        ioBuf[bytesRecieved] = '\0';
-        printf("%s\n" , ioBuf);
-        fflush(stdout);
+        if (bytesRecieved <=0)
+        {
+            FixRecievingError(bytesRecieved, &socketFD, "Recieving error.\n");
+            exit(1);
+        }
+        else
+        {
+            ioBuf[bytesRecieved] = '\0';
+            printf("%s\n" , ioBuf);
+            fflush(stdout);
+        }
     }
 }
