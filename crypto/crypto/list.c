@@ -80,7 +80,6 @@ int DeleteItem( List *list, int socketFD )
       {
          if ( previousItem != 0 )
          {
-
              previousItem->next = item->next;
          }
          else

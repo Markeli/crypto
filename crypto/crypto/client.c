@@ -51,8 +51,6 @@ int RunClient(char _userName[PARAMETRS_LENGTH])
             }
         }
     }
-    printf("Client quited\n");
-    close(socketFD);
     return 0;
 }
 
@@ -106,7 +104,7 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
                 if (strcmp(buffer, "admin") == 0)
                 {
                     printf("This username belongs to admin. If you are admin, enter password:.\n");
-                    GetPassword(buffer);
+                    GetPassword(buffer, PASS_CLIENT);
                     if (send(*socketFD, buffer, BUFSIZE, 0) <= 0)
                     {
                         perror("connect");
@@ -147,6 +145,9 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
         fgets(tempBuf, BUFSIZE, stdin);
         if (strcmp(tempBuf , "quit\n") == 0)
         {
+
+            printf("Client quited\n");
+            close(socketFD);
             exit(0);
         }
         else
