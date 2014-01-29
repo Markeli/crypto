@@ -249,6 +249,7 @@ static int SearchControlMessage(char recievedBuf[BUFSIZE])
     {
         exit(0);
     }
+    return 0;
 }
 
 static void SendToAll(int currentSocketFD, int serverSocketFD, int recievedBytesCount, char *recievedBuf, fd_set *master)

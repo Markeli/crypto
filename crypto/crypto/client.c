@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <termios.h>
+#include <curses.h>
+#include <pthread.h>
 
 #include <common.h>
 
@@ -16,9 +19,19 @@
 #define PORT 8547
 
 char userName[PARAMETRS_LENGTH];
+WINDOW *top;
+WINDOW *bottom;
+int line=1; // Line position of top
+int input=1; // Line position of top
+int maxx,maxy; // Screen dimensions
+pthread_mutex_t mutexsum = PTHREAD_MUTEX_INITIALIZER;
 
 static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres);
 static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH]);
+
+static void *SendMessage(int socketFD);
+
+static void *RecieveMessage(int socketFD);
 
 int RunClient(char _userName[PARAMETRS_LENGTH])
 {
@@ -26,6 +39,12 @@ int RunClient(char _userName[PARAMETRS_LENGTH])
     struct sockaddr_in serverAddres;
     fd_set master;
     fd_set readFDS;
+    pthread_t threads[2];
+    void *status;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
     strcpy(userName, _userName);
     ConnectRequest(&socketFD, &serverAddres);
     FD_ZERO(&master);
@@ -34,8 +53,27 @@ int RunClient(char _userName[PARAMETRS_LENGTH])
     FD_SET(socketFD, &master);
     fdMax = socketFD;
 
+    initscr();
+    getmaxyx(stdscr,maxy,maxx);
+
+    top = newwin(maxy/2,maxx,0,0);
+    bottom= newwin(maxy/2,maxx,maxy/2,0);
+
+    scrollok(top,TRUE);
+    scrollok(bottom,TRUE);
+    box(top,'|','=');
+
+    wsetscrreg(top,1,maxy/2-2);
+    wsetscrreg(bottom,1,maxy/2-2);
+
+    wrefresh(top);
+    wrefresh(bottom);
+
+
     while(1)
     {
+        wrefresh(top);
+        wrefresh(bottom);
         readFDS = master;
         if(select(fdMax+1, &readFDS, NULL, NULL, NULL) == -1)
         {
@@ -134,6 +172,91 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
     }
 }
 
+static void *SendMessage(int socketFD)
+{
+    char tempBuf[BUFSIZE];
+    char sendBuf[BUFSIZE];
+    while (1)
+    {
+        mvwgetstr(bottom,input,2,tempBuf);
+        //fgets(tempBuf, BUFSIZE, stdin);
+        if (strcmp(tempBuf , "quit") == 0)
+        {
+            endwin();
+            printf("Client quited\n");
+            close(socketFD);
+
+            pthread_mutex_destroy(&mutexsum);
+            pthread_exit(NULL);
+            exit(0);
+        }
+        else
+        {
+            strcpy(sendBuf, userName);
+            strcat(sendBuf, ": ");
+            strcat(sendBuf, tempBuf);
+            send(socketFD, sendBuf, strlen(sendBuf), 0);
+
+            pthread_mutex_lock (&mutexsum);
+            if(line!=maxy/2-2)
+            {
+                line++;
+            }
+            else
+            {
+                scroll(top);
+            }
+
+            wclear(bottom);
+
+            wrefresh(top);
+            wrefresh(bottom);
+            pthread_mutex_unlock (&mutexsum);
+        }
+    }
+}
+
+static void *RecieveMessage(int socketFD)
+{
+    char recievedBuf[BUFSIZE];
+    int bytesRecieved;
+    while (1)
+    {
+        bytesRecieved = recv(socketFD, recievedBuf, BUFSIZE, 0);
+
+        if (bytesRecieved <=0)
+        {
+            endwin();
+            FixRecievingError(bytesRecieved, &socketFD, "Recieving error. Maybe server closed. App is closing...\n");
+            exit(1);
+        }
+        else
+        {
+            recievedBuf[bytesRecieved] = '\0';
+            mvwprintw(top,line,3,recievedBuf);
+
+            pthread_mutex_lock (&mutexsum);
+
+            if(line!=maxy/2-2)
+            {
+                line++;
+            }
+            else
+            {
+
+                scroll(top);
+            }
+            //printf("%s\n" , ioBuf);
+            fflush(stdout);
+
+            wrefresh(top);
+            wrefresh(bottom);
+            pthread_mutex_unlock (&mutexsum);
+        }
+
+    }
+}
+
 static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
 {
     char tempBuf[BUFSIZE];
@@ -142,10 +265,12 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
 
     if (i == 0)
     {
-        fgets(tempBuf, BUFSIZE, stdin);
-        if (strcmp(tempBuf , "quit\n") == 0)
-        {
 
+        mvwgetstr(bottom,input,2,tempBuf);
+        //fgets(tempBuf, BUFSIZE, stdin);
+        if (strcmp(tempBuf , "quit") == 0)
+        {
+            endwin();
             printf("Client quited\n");
             close(socketFD);
             exit(0);
@@ -153,24 +278,48 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
         else
         {
             strcpy(ioBuf, userName);
-            strcat(ioBuf, ":\n");
+            strcat(ioBuf, ": ");
             strcat(ioBuf, tempBuf);
             send(socketFD, ioBuf, strlen(ioBuf), 0);
+
+            if(line!=maxy/2-2)
+            {
+                line++;
+            }
+            else
+            {
+                scroll(top);
+            }
+            wclear(bottom);
         }
     }
     else
     {
         bytesRecieved = recv(socketFD, ioBuf, BUFSIZE, 0);
+
         if (bytesRecieved <=0)
         {
+            endwin();
             FixRecievingError(bytesRecieved, &socketFD, "Recieving error. Maybe server closed. App is closing...\n");
             exit(1);
         }
         else
         {
             ioBuf[bytesRecieved] = '\0';
-            printf("%s\n" , ioBuf);
+            mvwprintw(top,line,3,ioBuf);
+            if(line!=maxy/2-2)
+            {
+                line++;
+            }
+            else
+            {
+
+                scroll(top);
+            }
+            //printf("%s\n" , ioBuf);
             fflush(stdout);
         }
     }
+    wrefresh(top);
+    wrefresh(bottom);
 }

@@ -10,6 +10,6 @@
 
 void GetUserName(char userName[PARAMETRS_LENGTH]);
 void GetPassword(char password[PARAMETRS_LENGTH], int passwordOwner);
-void FixRecievingError(int recievedBytesCount, int *socketFD, char* errorMessage);
+void FixRecievingError(int recievedBytesCount, int* socketFD, char* errorMessage);
 
 #endif

@@ -15,3 +15,7 @@ HEADERS += \
     server.h \
     list.h
 
+
+unix|win32: LIBS += -lncurses
+
+unix|win32: LIBS += -lpthread

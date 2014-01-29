@@ -41,7 +41,7 @@ static void GetPasswordByCharacter(char password[PARAMETRS_LENGTH], char* messag
 
         newt.c_lflag &= ~( ICANON | ECHO );
         tcsetattr ( 0, TCSANOW, &newt );
-        printf(message);
+        printf("%s\n",message);
         puts("");
         while (1)
         {
