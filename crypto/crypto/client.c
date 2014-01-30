@@ -11,7 +11,7 @@
 #include <termios.h>
 #include <curses.h>
 #include <pthread.h>
-
+#include <openssl/aes.h>
 #include <common.h>
 
 char userName[PARAMETRS_LENGTH];
@@ -21,6 +21,9 @@ int line=1; // Line position of top
 int input=1; // Line position of top
 int maxx,maxy; // Screen dimensions
 pthread_mutex_t mutexsum = PTHREAD_MUTEX_INITIALIZER;
+
+unsigned char key[32];
+AES_KEY encKey, decKey;
 
 static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres);
 static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH]);
@@ -107,11 +110,21 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
         perror("connect");
         exit(1);
     }
-    strcpy(buffer, userName);
+    /*Getting aes key*/
+    if ((recievedBytesCount = recv(*socketFD, key, 32, 0)) <= 0)
+    {
+        FixRecievingError(recievedBytesCount, *socketFD, "Connetion error occured. Can't receive aes key.\n");
+        exit(1);
+    }
 
+    AES_set_encrypt_key(key, 128, &encKey);
+    AES_set_decrypt_key(key, 128, &decKey);
+    /*Sending username to server*/
+    strcpy(buffer, userName);
+    AES_encrypt(buffer, buffer, &encKey);
     if (send(*socketFD, buffer, BUFSIZE, 0) <= 0)
     {
-        perror("connect");
+        perror("connect username");
         exit(1);
     }
     if ((recievedBytesCount = recv(*socketFD, buffer, BUFSIZE, 0)) <= 0)
@@ -121,6 +134,7 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
     }
     else
     {
+        AES_decrypt(buffer, buffer, &decKey);
         if (strcmp(buffer, "wellcome") == 0)
         {
             printf("Connetion is succesfull.\n");
@@ -139,6 +153,7 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
                 {
                     printf("This username belongs to admin. If you are admin, enter password:.\n");
                     GetPassword(buffer, PASS_CLIENT);
+                    AES_encrypt(buffer, buffer, &encKey);
                     if (send(*socketFD, buffer, BUFSIZE, 0) <= 0)
                     {
                         perror("connect");
@@ -151,6 +166,7 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
                     }
                     else
                     {
+                        AES_decrypt(buffer, buffer, &decKey);
                         if (strcmp(buffer, "wellcome") == 0)
                         {
                             printf("Connetion is succesfull.\n");
@@ -168,90 +184,6 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
     }
 }
 
-static void *SendMessage(int socketFD)
-{
-    unsigned char tempBuf[BUFSIZE];
-    unsigned char sendBuf[BUFSIZE];
-    while (1)
-    {
-        mvwgetstr(bottom,input,2,tempBuf);
-        //fgets(tempBuf, BUFSIZE, stdin);
-        if (strcmp(tempBuf , "quit") == 0)
-        {
-            endwin();
-            printf("Client quited\n");
-            close(socketFD);
-
-            pthread_mutex_destroy(&mutexsum);
-            pthread_exit(NULL);
-            exit(0);
-        }
-        else
-        {
-            strcpy(sendBuf, userName);
-            strcat(sendBuf, ": ");
-            strcat(sendBuf, tempBuf);
-            send(socketFD, sendBuf, strlen(sendBuf), 0);
-
-            pthread_mutex_lock (&mutexsum);
-            if(line!=maxy/2-2)
-            {
-                line++;
-            }
-            else
-            {
-                scroll(top);
-            }
-
-            wclear(bottom);
-
-            wrefresh(top);
-            wrefresh(bottom);
-            pthread_mutex_unlock (&mutexsum);
-        }
-    }
-}
-
-static void *RecieveMessage(int socketFD)
-{
-    unsigned char recievedBuf[BUFSIZE];
-    int bytesRecieved;
-    while (1)
-    {
-        bytesRecieved = recv(socketFD, recievedBuf, BUFSIZE, 0);
-
-        if (bytesRecieved <=0)
-        {
-            endwin();
-            FixRecievingError(bytesRecieved, &socketFD, "Recieving error. Maybe server closed. App is closing...\n");
-            exit(1);
-        }
-        else
-        {
-            recievedBuf[bytesRecieved] = '\0';
-            mvwprintw(top,line,3,recievedBuf);
-
-            pthread_mutex_lock (&mutexsum);
-
-            if(line!=maxy/2-2)
-            {
-                line++;
-            }
-            else
-            {
-
-                scroll(top);
-            }
-            //printf("%s\n" , ioBuf);
-            fflush(stdout);
-
-            wrefresh(top);
-            wrefresh(bottom);
-            pthread_mutex_unlock (&mutexsum);
-        }
-
-    }
-}
 
 static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
 {
@@ -263,7 +195,6 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
     {
 
         mvwgetstr(bottom,input,2,tempBuf);
-        //fgets(tempBuf, BUFSIZE, stdin);
         if (strcmp(tempBuf , "quit") == 0)
         {
             endwin();
@@ -276,6 +207,8 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
             strcpy(ioBuf, userName);
             strcat(ioBuf, ": ");
             strcat(ioBuf, tempBuf);
+
+            AES_encrypt(ioBuf,ioBuf, &encKey);
             send(socketFD, ioBuf, strlen(ioBuf), 0);
 
             if(line!=maxy/2-2)
@@ -301,6 +234,7 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
         }
         else
         {
+            AES_decrypt(ioBuf,ioBuf,&decKey);
             ioBuf[bytesRecieved] = '\0';
             mvwprintw(top,line,3,ioBuf);
             if(line!=maxy/2-2)
@@ -312,8 +246,6 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
 
                 scroll(top);
             }
-            //printf("%s\n" , ioBuf);
-            fflush(stdout);
         }
     }
     wrefresh(top);

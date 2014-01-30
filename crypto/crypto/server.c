@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <openssl/evp.h>
+#include <openssl/aes.h>
 
 #include <common.h>
 #include <list.h>
@@ -21,6 +22,7 @@ List *clientList;
 unsigned char key[32];
 unsigned char iv[8];
 EVP_CIPHER_CTX ctx;
+AES_KEY encKey,decKey;
 
 static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres);
 static void ConnectionAccept(fd_set *master, int *fdMax, int socketFD, struct sockaddr_in *clientAddres);
@@ -39,18 +41,18 @@ int RunServer(char userName[PARAMETRS_LENGTH])
     int serverSocketFD= 0, i;
     struct sockaddr_in myAddres, clientAddres;
 
+    clientList = CreateList();
+    adminsSocketFD = -1;
+    GetPassword(adminsPass, PASS_SERVER);
+    printf("Password have been saved.\n");
     Generate_AES_256_KEY(key);
-
+    AES_set_encrypt_key(key, 128, &encKey);
+    AES_set_decrypt_key(key, 128, &decKey);
     for (i=0; i<32; ++i)
     {
         printf("%d", key[i]);
     }
     printf("\n");
-
-    clientList = CreateList();
-    adminsSocketFD = -1;
-    GetPassword(adminsPass, PASS_SERVER);
-    printf("Password have been saved.\n");
     FD_ZERO(&master);
     FD_ZERO(&readFDS);
     ConnectRequest(&serverSocketFD, &myAddres);
@@ -133,21 +135,28 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
     }
     else
     {
-        /*Getting clients username*/
+        /*Sending AES_256 key*/
+        if (send(clientSocketFD, key, 32, 0) == -1)
+        {
+            perror("send");
+        }
+        /*Getting clients username*/;
         if ((recievedBytesCount = recv(clientSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
         {
             FixRecievingError(recievedBytesCount, &clientSocketFD,"Connetion error occured.\n");
         }
         else
         {
+            AES_decrypt(recievedBuffer, recievedBuffer, &decKey);
             /*Check uniq username in clientList*/
             if (InsertItemUniq(clientList, clientSocketFD, recievedBuffer) == TRUE)
             {
                 /*Check if username belongs to admin*/
                 if (strcmp(recievedBuffer, adminsName) == 0)
                 {
-                    strcpy(sendBuffer, "admin");
                     /*Requesting for getting admins password*/
+                    strcpy(sendBuffer, "admin");
+                    AES_encrypt(sendBuffer,sendBuffer, &encKey);
                     if (send(clientSocketFD, sendBuffer, BUFSIZE, 0) == -1)
                     {
                         perror("send");
@@ -159,6 +168,7 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
                     }
                     else
                     {
+                        AES_decrypt(recievedBuffer,recievedBuffer, &decKey);
                         if (strcmp(recievedBuffer, adminsPass) == 0)
                         {
                             AcceptClient(&clientSocketFD, master, fdMax, clientAddres);
