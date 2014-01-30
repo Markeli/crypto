@@ -8,6 +8,9 @@
 #define PASS_CLIENT 0
 #define PASS_SERVER 1
 
+#define BUFSIZE 1024
+#define PORT 8547
+
 void GetUserName(char userName[PARAMETRS_LENGTH]);
 void GetPassword(char password[PARAMETRS_LENGTH], int passwordOwner);
 void FixRecievingError(int recievedBytesCount, int* socketFD, char* errorMessage);

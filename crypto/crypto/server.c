@@ -7,35 +7,45 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <openssl/evp.h>
 
 #include <common.h>
 #include <list.h>
-
-#define PORT 8547
-#define BUFSIZE 1024
+#include <cipher.h>
 
 char adminsName[PARAMETRS_LENGTH];
 char adminsPass[PARAMETRS_LENGTH];
 int adminsSocketFD;
 List *clientList;
 
+unsigned char key[32];
+unsigned char iv[8];
+EVP_CIPHER_CTX ctx;
+
 static void ConnectRequest(int *socketFD, struct sockaddr_in *myAddres);
 static void ConnectionAccept(fd_set *master, int *fdMax, int socketFD, struct sockaddr_in *clientAddres);
 static void DenialOfAccepting(int *newSocketFD);
 static void AcceptClient(int *newSocketFD, fd_set *master, int *fdMax, struct sockaddr_in *clientAddres);
 static void ReSend(int activeSocket, fd_set *master, int serverSocketFD, int fdMax);
-static int SearchControlMessage(char recievedBuf[BUFSIZE]);
-static void SendToAll(int currentSocketFD, int serverSocketFD, int recievedBytesCount, char *recievedBuf, fd_set *master);
-
-
+static int SearchControlMessage(unsigned char recievedBuf[BUFSIZE]);
+static void SendToAll(int currentSocketFD, int serverSocketFD, int recievedBytesCount, unsigned char *recievedBuf, fd_set *master);
+void CreateAESContext();
 
 int RunServer(char userName[PARAMETRS_LENGTH])
 {
     fd_set master;
     fd_set readFDS;
     int fdMax, activeSocket;
-    int serverSocketFD= 0;
+    int serverSocketFD= 0, i;
     struct sockaddr_in myAddres, clientAddres;
+
+    Generate_AES_256_KEY(key);
+
+    for (i=0; i<32; ++i)
+    {
+        printf("%d", key[i]);
+    }
+    printf("\n");
 
     clientList = CreateList();
     adminsSocketFD = -1;
@@ -176,7 +186,7 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
 
 static void AcceptClient(int *newSocketFD, fd_set *master, int *fdMax, struct sockaddr_in *clientAddres)
 {
-    char sendBuffer[BUFSIZE];
+    unsigned char sendBuffer[BUFSIZE];
     strcpy(sendBuffer, "wellcome");
     if (send(*newSocketFD, sendBuffer, BUFSIZE, 0) == -1)
     {
@@ -195,7 +205,7 @@ static void AcceptClient(int *newSocketFD, fd_set *master, int *fdMax, struct so
 
 static void DenialOfAccepting(int *newSocketFD)
 {
-    char sendBuffer[BUFSIZE];
+    unsigned char sendBuffer[BUFSIZE];
     strcpy(sendBuffer, "sorry");
     if (send(*newSocketFD, sendBuffer, BUFSIZE, 0) == -1)
     {
@@ -207,7 +217,7 @@ static void DenialOfAccepting(int *newSocketFD)
 static void ReSend(int activeSocket, fd_set *master, int serverSocketFD, int fdMax)
 {
     int recievedBytesCount, clientSocket;
-    char recievedBuf[BUFSIZE];
+    unsigned char recievedBuf[BUFSIZE];
 
     if ((recievedBytesCount = recv(activeSocket, recievedBuf, BUFSIZE, 0)) <= 0)
     {
@@ -243,7 +253,7 @@ static void ReSend(int activeSocket, fd_set *master, int serverSocketFD, int fdM
     }
 }
 
-static int SearchControlMessage(char recievedBuf[BUFSIZE])
+static int SearchControlMessage(unsigned char recievedBuf[BUFSIZE])
 {
     if (!strstr(recievedBuf , "server -close"))
     {
@@ -252,7 +262,7 @@ static int SearchControlMessage(char recievedBuf[BUFSIZE])
     return 0;
 }
 
-static void SendToAll(int currentSocketFD, int serverSocketFD, int recievedBytesCount, char *recievedBuf, fd_set *master)
+static void SendToAll(int currentSocketFD, int serverSocketFD, int recievedBytesCount, unsigned char *recievedBuf, fd_set *master)
 {
     if (FD_ISSET(currentSocketFD, master))
     {

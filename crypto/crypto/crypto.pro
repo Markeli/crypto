@@ -7,15 +7,19 @@ SOURCES += \
     main.c \
     server.c \
     common.c \
-    list.c
+    list.c \
+    cipher.c
 
 HEADERS += \
     client.h \
     common.h \
     server.h \
-    list.h
+    list.h \
+    cipher.h
 
 
 unix|win32: LIBS += -lncurses
 
 unix|win32: LIBS += -lpthread
+
+unix|win32: LIBS += -lcrypto

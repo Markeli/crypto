@@ -14,10 +14,6 @@
 
 #include <common.h>
 
-
-#define BUFSIZE 1024
-#define PORT 8547
-
 char userName[PARAMETRS_LENGTH];
 WINDOW *top;
 WINDOW *bottom;
@@ -94,7 +90,7 @@ int RunClient(char _userName[PARAMETRS_LENGTH])
 
 static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
 {
-    char buffer[BUFSIZE];
+    unsigned char buffer[BUFSIZE];
     int recievedBytesCount;
     if ((*socketFD = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
@@ -174,8 +170,8 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
 
 static void *SendMessage(int socketFD)
 {
-    char tempBuf[BUFSIZE];
-    char sendBuf[BUFSIZE];
+    unsigned char tempBuf[BUFSIZE];
+    unsigned char sendBuf[BUFSIZE];
     while (1)
     {
         mvwgetstr(bottom,input,2,tempBuf);
@@ -218,7 +214,7 @@ static void *SendMessage(int socketFD)
 
 static void *RecieveMessage(int socketFD)
 {
-    char recievedBuf[BUFSIZE];
+    unsigned char recievedBuf[BUFSIZE];
     int bytesRecieved;
     while (1)
     {
@@ -259,8 +255,8 @@ static void *RecieveMessage(int socketFD)
 
 static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
 {
-    char tempBuf[BUFSIZE];
-    char ioBuf[BUFSIZE];
+    unsigned char tempBuf[BUFSIZE];
+    unsigned char ioBuf[BUFSIZE];
     int bytesRecieved;
 
     if (i == 0)
