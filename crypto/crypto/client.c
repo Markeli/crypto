@@ -23,15 +23,11 @@ int input=1; // Line position of top
 int maxx,maxy; // Screen dimensions
 pthread_mutex_t mutexsum = PTHREAD_MUTEX_INITIALIZER;
 
-unsigned char key[32];
+unsigned char* AESKey;
 AES_KEY encKey, decKey;
 
 static void ConnectRequest(int *sockfd, struct sockaddr_in *serverAddres);
 static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH]);
-
-static void *SendMessage(int socketFD);
-
-static void *RecieveMessage(int socketFD);
 
 int RunClient(char _userName[PARAMETRS_LENGTH])
 {
@@ -39,8 +35,6 @@ int RunClient(char _userName[PARAMETRS_LENGTH])
     struct sockaddr_in serverAddres;
     fd_set master;
     fd_set readFDS;
-    pthread_t threads[2];
-    void *status;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -93,10 +87,11 @@ int RunClient(char _userName[PARAMETRS_LENGTH])
 
 static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
 {
-    unsigned char buffer[BUFSIZE];
+    unsigned char ioBuffer[BUFSIZE];
     unsigned char *RSAKey;
-    int recievedBytesCount, rsaKeyLength, sendBytes;
-    RSA* rsa;
+    int receivedBytesCount, rsaKeyLength, keySize;
+    RSA *rsa, *privateKeyRSA;
+
     if ((*socketFD = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         perror("Socket");
@@ -112,8 +107,8 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
         perror("connect");
         exit(1);
     }
-    /*Send public key*/
-    printf("Generating rsa keys...  ");
+
+    printf("Generating RSA keys...  ");
     rsa = Generate_RSA_Keys();
     if (rsa == NULL)
     {
@@ -123,58 +118,66 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
     printf("done\n");
     printf("Getting public RSA key...  ");
     RSAKey = GetPublicKeyFromRSA(rsa, &rsaKeyLength);
-
     if (rsaKeyLength != RSA_PUBLIC_KEY_LENGTH)
     {
         printf("\nGetting RSA public key error\n");
         exit(1);
     }
-    printf("Key size = %d\n", rsaKeyLength);
-    printf("Key:\n%s\n", RSAKey);
     printf("done\n");
 
     printf("Sending RSA public key...  ");
-    if ((sendBytes = send(*socketFD, RSAKey, RSA_PUBLIC_KEY_LENGTH, 0)) <= 0)
+    if (send(*socketFD, RSAKey, RSA_PUBLIC_KEY_LENGTH, 0) <= 0)
     {
-        printf("\nSend %d bytes\n", sendBytes);
         perror("Sending RSA public key");
         exit(1);
     }
-    printf("\nSend %d bytes\n", sendBytes);
     printf("done\n");
 
-    /*Getting aes key*/
-    if ((recievedBytesCount = recv(*socketFD, key, 32, 0)) <= 0)
+    printf("Getting AES cipher key...  ");
+    GetPrivateKey(rsa);
+    keySize = RSA_size(rsa);
+    if ((receivedBytesCount = recv(*socketFD, ioBuffer, keySize, 0)) <= 0)
     {
-        FixReceivingError(recievedBytesCount, *socketFD, "Connetion error occured. Can't receive aes key.\n");
+        FixReceivingError(receivedBytesCount, *socketFD, "Connetion error occured. Can't receive aes key.\n");
+        exit(1);
+    }
+    printf("done\n");
+    printf("Received %d bytes\n", receivedBytesCount);
+    printf("Decrypting AES key...  ");
+    AESKey = DecryptSimmetricKey(ioBuffer, rsa);
+    if (AESKey == NULL)
+    {
+        perror("Decrypting AES key error...");
         exit(1);
     }
     /*Set aes keys*/
-    AES_set_encrypt_key(key, 128, &encKey);
-    AES_set_decrypt_key(key, 128, &decKey);
+    AES_set_encrypt_key(AESKey, 128, &encKey);
+    AES_set_decrypt_key(AESKey, 128, &decKey);
+    printf("done\n");
+
     /*Sending username to server*/
-    strcpy(buffer, userName);
-    AES_encrypt(buffer, buffer, &encKey);
-    if (send(*socketFD, buffer, BUFSIZE, 0) <= 0)
+    strcpy(ioBuffer, userName);
+    AES_encrypt(ioBuffer, ioBuffer, &encKey);
+    if (send(*socketFD, ioBuffer, BUFSIZE, 0) <= 0)
     {
         perror("connect username");
         exit(1);
     }
-    if ((recievedBytesCount = recv(*socketFD, buffer, BUFSIZE, 0)) <= 0)
+    if ((receivedBytesCount = recv(*socketFD, ioBuffer, BUFSIZE, 0)) <= 0)
     {
-        FixReceivingError(recievedBytesCount, *socketFD, "Connetion error occured.\n");
+        FixReceivingError(receivedBytesCount, *socketFD, "Connetion error occured.\n");
         exit(1);
     }
     else
     {
-        AES_decrypt(buffer, buffer, &decKey);
-        if (strcmp(buffer, "wellcome") == 0)
+        AES_decrypt(ioBuffer, ioBuffer, &decKey);
+        if (strcmp(ioBuffer, "welcome") == 0)
         {
             printf("Connetion is succesfull.\n");
         }
         else
         {
-            if (strcmp(buffer, "sorry") == 0)
+            if (strcmp(ioBuffer, "sorry") == 0)
             {
                 printf("This username is already taken. Choose antoher and try again.\n");
                 close(*socketFD);
@@ -182,25 +185,25 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
             }
             else
             {
-                if (strcmp(buffer, "admin") == 0)
+                if (strcmp(ioBuffer, "admin") == 0)
                 {
                     printf("This username belongs to admin. If you are admin, enter password:.\n");
-                    GetPassword(buffer, PASS_CLIENT);
-                    AES_encrypt(buffer, buffer, &encKey);
-                    if (send(*socketFD, buffer, BUFSIZE, 0) <= 0)
+                    GetPassword(ioBuffer, PASS_CLIENT);
+                    AES_encrypt(ioBuffer, ioBuffer, &encKey);
+                    if (send(*socketFD, ioBuffer, BUFSIZE, 0) <= 0)
                     {
                         perror("connect");
                         exit(1);
                     }
-                    if ((recievedBytesCount = recv(*socketFD, buffer, BUFSIZE, 0)) <= 0)
+                    if ((receivedBytesCount = recv(*socketFD, ioBuffer, BUFSIZE, 0)) <= 0)
                     {
-                        FixReceivingError(recievedBytesCount, *socketFD, "Connetion error occured.\n");
+                        FixReceivingError(receivedBytesCount, *socketFD, "Connetion error occured.\n");
                         exit(1);
                     }
                     else
                     {
-                        AES_decrypt(buffer, buffer, &decKey);
-                        if (strcmp(buffer, "wellcome") == 0)
+                        AES_decrypt(ioBuffer, ioBuffer, &decKey);
+                        if (strcmp(ioBuffer, "welcome") == 0)
                         {
                             printf("Connetion is succesfull.\n");
                         }
@@ -220,15 +223,15 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
 
 static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
 {
-    unsigned char tempBuf[BUFSIZE];
-    unsigned char ioBuf[BUFSIZE];
-    int bytesRecieved;
+    unsigned char tempBuffer[BUFSIZE];
+    unsigned char ioBuffer[BUFSIZE];
+    int bytesReceived;
 
     if (i == 0)
     {
 
-        mvwgetstr(bottom,input,2,tempBuf);
-        if (strcmp(tempBuf , "quit") == 0)
+        mvwgetstr(bottom,input,2,tempBuffer);
+        if (strcmp(tempBuffer , "quit") == 0)
         {
             endwin();
             printf("Client quited\n");
@@ -237,12 +240,12 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
         }
         else
         {
-            strcpy(ioBuf, userName);
-            strcat(ioBuf, ": ");
-            strcat(ioBuf, tempBuf);
+            strcpy(ioBuffer, userName);
+            strcat(ioBuffer, ": ");
+            strcat(ioBuffer, tempBuffer);
 
-            AES_encrypt(ioBuf,ioBuf, &encKey);
-            send(socketFD, ioBuf, strlen(ioBuf), 0);
+            AES_encrypt(ioBuffer,ioBuffer, &encKey);
+            send(socketFD, ioBuffer, strlen(ioBuffer), 0);
 
             if(line!=maxy/2-2)
             {
@@ -257,19 +260,19 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
     }
     else
     {
-        bytesRecieved = recv(socketFD, ioBuf, BUFSIZE, 0);
+        bytesReceived = recv(socketFD, ioBuffer, BUFSIZE, 0);
 
-        if (bytesRecieved <=0)
+        if (bytesReceived <=0)
         {
             endwin();
-            FixReceivingError(bytesRecieved, &socketFD, "Recieving error. Maybe server closed. App is closing...\n");
+            FixReceivingError(bytesReceived, &socketFD, "Receiving error. Maybe server closed. App is closing...\n");
             exit(1);
         }
         else
         {
-            AES_decrypt(ioBuf,ioBuf,&decKey);
-            ioBuf[bytesRecieved] = '\0';
-            mvwprintw(top,line,3,ioBuf);
+            AES_decrypt(ioBuffer,ioBuffer,&decKey);
+            ioBuffer[bytesReceived] = '\0';
+            mvwprintw(top,line,3,ioBuffer);
             if(line!=maxy/2-2)
             {
                 line++;

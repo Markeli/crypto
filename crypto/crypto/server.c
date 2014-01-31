@@ -19,7 +19,7 @@ char adminsPass[PARAMETRS_LENGTH];
 int adminsSocketFD;
 List *clientList;
 
-unsigned char key[32];
+unsigned char* AESKey;
 unsigned char iv[8];
 EVP_CIPHER_CTX ctx;
 AES_KEY encKey,decKey;
@@ -38,17 +38,18 @@ int RunServer(char userName[PARAMETRS_LENGTH])
     fd_set master;
     fd_set readFDS;
     int fdMax, activeSocket;
-    int serverSocketFD= 0, i;
+    int serverSocketFD= 0;
     struct sockaddr_in myAddres, clientAddres;
 
     clientList = CreateList();
     adminsSocketFD = -1;
     GetPassword(adminsPass, PASS_SERVER);
     printf("Password have been saved.\n");
+
     printf("Generating AES key...  ");
-    Generate_AES_256_KEY(key);
-    AES_set_encrypt_key(key, 128, &encKey);
-    AES_set_decrypt_key(key, 128, &decKey);
+    AESKey = Generate_AES_256_KEY();
+    AES_set_encrypt_key(AESKey, 128, &encKey);
+    AES_set_decrypt_key(AESKey, 128, &decKey);
     printf("done\n");
     FD_ZERO(&master);
     FD_ZERO(&readFDS);
@@ -119,14 +120,14 @@ static void ConnectRequest(int *serverSocketFD, struct sockaddr_in *myAddres)
 /*Accepting new client*/
 static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, struct sockaddr_in *clientAddres)
 {
-    int receivedBytesCount;
+    int receivedBytesCount, keySize, encSize;
     socklen_t addresLength;
     int clientSocketFD;
-    char recievedBuffer[BUFSIZE], sendBuffer[BUFSIZE];
-    unsigned char publicKey[RSA_KEY_LENGTH];
-    RSA *rsa;
+    unsigned char recievedBuffer[BUFSIZE], sendBuffer[BUFSIZE];
+    unsigned char* publicKeyBuffer;
+    RSA *RSAPublicKey;
     addresLength = sizeof(struct sockaddr_in);
-
+    printf("\nCreating new conection...\n");
     if((clientSocketFD = accept(serverSocketFD, (struct sockaddr *)clientAddres, &addresLength)) == -1)
     {
         perror("accept");
@@ -134,33 +135,38 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
     }
     else
     {
-        /*Getting public rsa key*/
-        printf("Getting public key...  ");
-        if ((receivedBytesCount = recv(clientSocketFD, publicKey, RSA_PUBLIC_KEY_LENGTH, 0)) <= 0)
+        printf("Getting public RSA key...  ");
+        publicKeyBuffer = malloc(RSA_PUBLIC_KEY_LENGTH+1);
+        if ((receivedBytesCount = recv(clientSocketFD, publicKeyBuffer, RSA_PUBLIC_KEY_LENGTH, 0)) <= 0)
         {
             printf("\nError. Recieve %d bytes.\n", receivedBytesCount);
             FixReceivingError(receivedBytesCount, &clientSocketFD,"Getting public key error.\n");
             exit(1);
         }
-        printf("\nRecieve %d bytes.\n", receivedBytesCount);
         printf("done\n");
-        printf("Key:\n%s\n", publicKey);
-        printf("Decoding...  ");
 
-        rsa = GetPublicKeyFromBuffer(publicKey, RSA_PUBLIC_KEY_LENGTH);
-        printf("done\n");
-        if (rsa == NULL)
+        printf("Decoding RSA public key...  ");
+        GetPublicKeyFromBuffer(&RSAPublicKey, publicKeyBuffer, RSA_PUBLIC_KEY_LENGTH);
+        if (RSAPublicKey == NULL)
         {
-            perror("d2i error");
+            perror("\nDecoding public key error.");
             exit(1);
         }
+        printf("done\n");
 
         /*Sending AES_256 key*/
-        if (send(clientSocketFD, key, 32, 0) == -1)
+        printf("Encrypting AES 256 key...");
+        encSize = EncryptSimmetricKey(AESKey, sendBuffer, AES_KEY_LENGTH, RSAPublicKey );
+        printf("  done\n");
+        printf("Sending cipher AES 256 key...");
+        keySize = RSA_size(RSAPublicKey);
+        if (send(clientSocketFD, sendBuffer, keySize, 0) == -1)
         {
             perror("send");
             exit(1);
         }
+        printf("done\n");
+
         /*Getting clients username*/;
         if ((receivedBytesCount = recv(clientSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
         {
@@ -218,7 +224,7 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
 static void AcceptClient(int *newSocketFD, fd_set *master, int *fdMax, struct sockaddr_in *clientAddres)
 {
     unsigned char sendBuffer[BUFSIZE];
-    strcpy(sendBuffer, "wellcome");
+    strcpy(sendBuffer, "welcome");
     if (send(*newSocketFD, sendBuffer, BUFSIZE, 0) == -1)
     {
         perror("send");
