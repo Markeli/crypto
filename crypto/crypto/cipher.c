@@ -83,7 +83,10 @@ void GetPublicKeyFromBuffer(RSA **rsa, unsigned char* publicKey, int keyLength)
 
 int EncryptSimmetricKey(unsigned char *key, unsigned char *sendBuffer, int size, RSA *rsa)
 {
-    return RSA_public_encrypt(size, key, sendBuffer, rsa, RSA_PKCS1_PADDING );
+    unsigned char *key1;
+    key1 = malloc(size);
+    memcpy(key1, key, size);
+    return RSA_public_encrypt(size, key1, sendBuffer, rsa, RSA_PKCS1_PADDING );
 }
 
 unsigned char* DecryptSimmetricKey(unsigned char* ciperKey, RSA* rsa)

@@ -20,7 +20,6 @@ int adminsSocketFD;
 List *clientList;
 
 unsigned char* AESKey;
-unsigned char iv[8];
 EVP_CIPHER_CTX ctx;
 AES_KEY encKey,decKey;
 
@@ -153,10 +152,13 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
             exit(1);
         }
         printf("done\n");
+        free(publicKeyBuffer);
 
         /*Sending AES_256 key*/
         printf("Encrypting AES 256 key...");
+        printf("\n%s\n", AESKey);
         encSize = EncryptSimmetricKey(AESKey, sendBuffer, AES_KEY_LENGTH, RSAPublicKey );
+        printf("\n%s\n", AESKey);
         printf("  done\n");
         printf("Sending cipher AES 256 key...");
         keySize = RSA_size(RSAPublicKey);
