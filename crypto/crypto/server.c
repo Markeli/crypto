@@ -45,14 +45,11 @@ int RunServer(char userName[PARAMETRS_LENGTH])
     adminsSocketFD = -1;
     GetPassword(adminsPass, PASS_SERVER);
     printf("Password have been saved.\n");
+    printf("Generating AES key...  ");
     Generate_AES_256_KEY(key);
     AES_set_encrypt_key(key, 128, &encKey);
     AES_set_decrypt_key(key, 128, &decKey);
-    for (i=0; i<32; ++i)
-    {
-        printf("%d", key[i]);
-    }
-    printf("\n");
+    printf("done\n");
     FD_ZERO(&master);
     FD_ZERO(&readFDS);
     ConnectRequest(&serverSocketFD, &myAddres);
@@ -122,12 +119,14 @@ static void ConnectRequest(int *serverSocketFD, struct sockaddr_in *myAddres)
 /*Accepting new client*/
 static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, struct sockaddr_in *clientAddres)
 {
-    int recievedBytesCount;
+    int receivedBytesCount;
     socklen_t addresLength;
     int clientSocketFD;
     char recievedBuffer[BUFSIZE], sendBuffer[BUFSIZE];
-
+    unsigned char publicKey[RSA_KEY_LENGTH];
+    RSA *rsa;
     addresLength = sizeof(struct sockaddr_in);
+
     if((clientSocketFD = accept(serverSocketFD, (struct sockaddr *)clientAddres, &addresLength)) == -1)
     {
         perror("accept");
@@ -135,15 +134,37 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
     }
     else
     {
+        /*Getting public rsa key*/
+        printf("Getting public key...  ");
+        if ((receivedBytesCount = recv(clientSocketFD, publicKey, RSA_PUBLIC_KEY_LENGTH, 0)) <= 0)
+        {
+            printf("\nError. Recieve %d bytes.\n", receivedBytesCount);
+            FixReceivingError(receivedBytesCount, &clientSocketFD,"Getting public key error.\n");
+            exit(1);
+        }
+        printf("\nRecieve %d bytes.\n", receivedBytesCount);
+        printf("done\n");
+        printf("Key:\n%s\n", publicKey);
+        printf("Decoding...  ");
+
+        rsa = GetPublicKeyFromBuffer(publicKey, RSA_PUBLIC_KEY_LENGTH);
+        printf("done\n");
+        if (rsa == NULL)
+        {
+            perror("d2i error");
+            exit(1);
+        }
+
         /*Sending AES_256 key*/
         if (send(clientSocketFD, key, 32, 0) == -1)
         {
             perror("send");
+            exit(1);
         }
         /*Getting clients username*/;
-        if ((recievedBytesCount = recv(clientSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
+        if ((receivedBytesCount = recv(clientSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
         {
-            FixRecievingError(recievedBytesCount, &clientSocketFD,"Connetion error occured.\n");
+            FixReceivingError(receivedBytesCount, &clientSocketFD,"Connetion error occured.\n");
         }
         else
         {
@@ -162,9 +183,9 @@ static void ConnectionAccept(fd_set *master, int *fdMax, int serverSocketFD, str
                         perror("send");
                     }
                     /*Getting admins password from client*/
-                    if ((recievedBytesCount = recv(clientSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
+                    if ((receivedBytesCount = recv(clientSocketFD, recievedBuffer, BUFSIZE, 0)) <= 0)
                     {
-                        FixRecievingError(recievedBytesCount, &clientSocketFD,"Connetion error occured.\n");
+                        FixReceivingError(receivedBytesCount, &clientSocketFD,"Connetion error occured.\n");
                     }
                     else
                     {

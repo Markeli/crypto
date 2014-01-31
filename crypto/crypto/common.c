@@ -4,7 +4,7 @@
 #include <termios.h>
 #include <string.h>
 
-static void SetErrors(char* paramsName, int *countOfErrors, int *isReadingSuccesfull);
+static void CheckReadingError(char* paramsName, int *countOfErrors, int *isReadingSuccesfull);
 static void GetPasswordByCharacter(char password[PARAMETRS_LENGTH], char* message);
 
 void GetPassword(char password[PARAMETRS_LENGTH], int passwordOwner)
@@ -41,7 +41,7 @@ static void GetPasswordByCharacter(char password[PARAMETRS_LENGTH], char* messag
 
         newt.c_lflag &= ~( ICANON | ECHO );
         tcsetattr ( 0, TCSANOW, &newt );
-        printf(message);
+        printf("%s",message);
         puts("");
         while (1)
         {
@@ -53,12 +53,12 @@ static void GetPasswordByCharacter(char password[PARAMETRS_LENGTH], char* messag
                     if (i < 5)
                     {
                         i = 0;
-                        SetErrors("password", &countOfErrors, &isReadingSuccesfull);
+                        CheckReadingError("password", &countOfErrors, &isReadingSuccesfull);
                     }
                     if (i > PARAMETRS_LENGTH)
                     {
                         i = 0;
-                        SetErrors("password", &countOfErrors, &isReadingSuccesfull);
+                        CheckReadingError("password", &countOfErrors, &isReadingSuccesfull);
                     }
                     password[i]='\0';
                     break;
@@ -66,7 +66,7 @@ static void GetPasswordByCharacter(char password[PARAMETRS_LENGTH], char* messag
                 if (c == ':')
                 {
                     i = 0;
-                    SetErrors("password", &countOfErrors, &isReadingSuccesfull);
+                    CheckReadingError("password", &countOfErrors, &isReadingSuccesfull);
                     break;
                 }
                 password[i++]=c;
@@ -92,15 +92,15 @@ void GetUserName(char userName[PARAMETRS_LENGTH])
         printf("Please, enter your username. Length must be less than %d.\nYou can use any characters except \":\" \n", PARAMETRS_LENGTH);
         if (scanf("%s",userName) == 0)
         {
-            SetErrors("username", &countOfErrors, &isReadingSuccesfull);
+            CheckReadingError("username", &countOfErrors, &isReadingSuccesfull);
         }
         if (strchr(userName, ':'))
         {
-            SetErrors("username", &countOfErrors, &isReadingSuccesfull);
+            CheckReadingError("username", &countOfErrors, &isReadingSuccesfull);
         }
         if (strlen(userName) >= 16)
         {
-            SetErrors("username", &countOfErrors, &isReadingSuccesfull);
+            CheckReadingError("username", &countOfErrors, &isReadingSuccesfull);
         }
     }
     while (isReadingSuccesfull == FALSE && countOfErrors <ERRORS_LIMIT);
@@ -111,19 +111,18 @@ void GetUserName(char userName[PARAMETRS_LENGTH])
     }
 }
 
-static void SetErrors(char* paramsName, int *countOfErrors, int *isReadingSuccesfull)
+static void CheckReadingError(char* paramsName, int *countOfErrors, int *isReadingSuccesfull)
 {
     printf("Incorrect %s. Try again.\n", paramsName);
     *isReadingSuccesfull = FALSE;
     (*countOfErrors)++;
 }
 
-void FixRecievingError(int recievedBytesCount, int* socketFD, char* errorMessage)
+void FixReceivingError(int recievedBytesCount, int* socketFD, char* errorMessage)
 {
     if (recievedBytesCount == 0)
     {
         printf("%s",errorMessage);
-        //printf("Connetion error occured.\n");
     }
     else
     {

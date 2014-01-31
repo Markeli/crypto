@@ -13,6 +13,7 @@
 #include <pthread.h>
 #include <openssl/aes.h>
 #include <common.h>
+#include <cipher.h>
 
 char userName[PARAMETRS_LENGTH];
 WINDOW *top;
@@ -68,7 +69,6 @@ int RunClient(char _userName[PARAMETRS_LENGTH])
     wrefresh(top);
     wrefresh(bottom);
 
-
     while(1)
     {
         wrefresh(top);
@@ -94,7 +94,9 @@ int RunClient(char _userName[PARAMETRS_LENGTH])
 static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
 {
     unsigned char buffer[BUFSIZE];
-    int recievedBytesCount;
+    unsigned char *RSAKey;
+    int recievedBytesCount, rsaKeyLength, sendBytes;
+    RSA* rsa;
     if ((*socketFD = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         perror("Socket");
@@ -110,13 +112,44 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
         perror("connect");
         exit(1);
     }
+    /*Send public key*/
+    printf("Generating rsa keys...  ");
+    rsa = Generate_RSA_Keys();
+    if (rsa == NULL)
+    {
+        perror("RSA keys generating error.");
+        exit(1);
+    }
+    printf("done\n");
+    printf("Getting public RSA key...  ");
+    RSAKey = GetPublicKeyFromRSA(rsa, &rsaKeyLength);
+
+    if (rsaKeyLength != RSA_PUBLIC_KEY_LENGTH)
+    {
+        printf("\nGetting RSA public key error\n");
+        exit(1);
+    }
+    printf("Key size = %d\n", rsaKeyLength);
+    printf("Key:\n%s\n", RSAKey);
+    printf("done\n");
+
+    printf("Sending RSA public key...  ");
+    if ((sendBytes = send(*socketFD, RSAKey, RSA_PUBLIC_KEY_LENGTH, 0)) <= 0)
+    {
+        printf("\nSend %d bytes\n", sendBytes);
+        perror("Sending RSA public key");
+        exit(1);
+    }
+    printf("\nSend %d bytes\n", sendBytes);
+    printf("done\n");
+
     /*Getting aes key*/
     if ((recievedBytesCount = recv(*socketFD, key, 32, 0)) <= 0)
     {
-        FixRecievingError(recievedBytesCount, *socketFD, "Connetion error occured. Can't receive aes key.\n");
+        FixReceivingError(recievedBytesCount, *socketFD, "Connetion error occured. Can't receive aes key.\n");
         exit(1);
     }
-
+    /*Set aes keys*/
     AES_set_encrypt_key(key, 128, &encKey);
     AES_set_decrypt_key(key, 128, &decKey);
     /*Sending username to server*/
@@ -129,7 +162,7 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
     }
     if ((recievedBytesCount = recv(*socketFD, buffer, BUFSIZE, 0)) <= 0)
     {
-        FixRecievingError(recievedBytesCount, *socketFD, "Connetion error occured.\n");
+        FixReceivingError(recievedBytesCount, *socketFD, "Connetion error occured.\n");
         exit(1);
     }
     else
@@ -161,7 +194,7 @@ static void ConnectRequest(int *socketFD, struct sockaddr_in *serverAddres)
                     }
                     if ((recievedBytesCount = recv(*socketFD, buffer, BUFSIZE, 0)) <= 0)
                     {
-                        FixRecievingError(recievedBytesCount, *socketFD, "Connetion error occured.\n");
+                        FixReceivingError(recievedBytesCount, *socketFD, "Connetion error occured.\n");
                         exit(1);
                     }
                     else
@@ -229,7 +262,7 @@ static void SendRecieve(int i, int socketFD, char userName[PARAMETRS_LENGTH])
         if (bytesRecieved <=0)
         {
             endwin();
-            FixRecievingError(bytesRecieved, &socketFD, "Recieving error. Maybe server closed. App is closing...\n");
+            FixReceivingError(bytesRecieved, &socketFD, "Recieving error. Maybe server closed. App is closing...\n");
             exit(1);
         }
         else
